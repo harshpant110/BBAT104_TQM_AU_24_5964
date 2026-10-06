@@ -1,1 +1,3 @@
 commit.txt
+.venv/
+data/*.db
