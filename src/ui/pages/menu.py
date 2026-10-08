@@ -1,5 +1,6 @@
+import sqlite3
 import tkinter as tk
-from tkinter import ttk
+from tkinter import messagebox, ttk
 
 import customtkinter as ctk
 
@@ -1010,9 +1011,38 @@ class MenuPage(ctk.CTkFrame):
         item_id,
         dialog
     ):
-        delete_menu_item(
-            item_id
-        )
+        try:
+            delete_menu_item(
+                item_id
+            )
+
+        except sqlite3.IntegrityError:
+            dialog.destroy()
+
+            messagebox.showerror(
+                "Cannot Delete Item",
+                (
+                    "This menu item cannot be deleted "
+                    "because it is used in an existing order."
+                ),
+                parent=self.winfo_toplevel()
+            )
+
+            return
+
+        except sqlite3.Error:
+            dialog.destroy()
+
+            messagebox.showerror(
+                "Delete Failed",
+                (
+                    "The menu item could not be deleted "
+                    "because of a database error."
+                ),
+                parent=self.winfo_toplevel()
+            )
+
+            return
 
         dialog.destroy()
 
