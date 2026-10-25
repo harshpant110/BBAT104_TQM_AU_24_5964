@@ -7,6 +7,21 @@ DATA_DIR = PROJECT_ROOT / "data"
 DATABASE_PATH = DATA_DIR / "restaurant.db"
 
 
+def validate_menu_price(price):
+    """Ensure a menu item's price is greater than zero."""
+    if isinstance(price, bool):
+        raise ValueError("Price must be a valid number.")
+
+    try:
+        price = float(price)
+    except (TypeError, ValueError):
+        raise ValueError("Price must be a valid number.") from None
+
+    if not 0 < price < float("inf"):
+        raise ValueError("Price must be greater than zero.")
+
+    return price
+
 def get_connection():
     """Create and return a connection to the SQLite database."""
     DATA_DIR.mkdir(exist_ok=True)
@@ -99,6 +114,7 @@ def get_menu_items():
 
 def add_menu_item(name, category, price, available=True):
     """Add a new menu item."""
+    price = validate_menu_price(price)
     connection = get_connection()
 
     try:
@@ -122,6 +138,7 @@ def add_menu_item(name, category, price, available=True):
 
 def update_menu_item(item_id, name, category, price, available):
     """Update an existing menu item."""
+    price = validate_menu_price(price)
     connection = get_connection()
 
     try:
