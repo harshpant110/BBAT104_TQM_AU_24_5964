@@ -54,3 +54,14 @@ Development, testing, quality analysis, documentation, and final demonstration w
 GitHub repository:
 
 `https://github.com/harshpant110/BBAT104_TQM_AU_24_5964`
+
+## Automated Tests
+
+Run the regression suite from the repository root:
+
+```bash
+PYTHONPATH=src:tests .venv/bin/python3 -m unittest discover -s tests -v
+```
+
+The tests use isolated in-memory SQLite databases and do not access
+data/restaurant.db.
