@@ -169,6 +169,26 @@ class OrderRegressionTests(IsolatedDatabaseTestCase):
         self.assertEqual(after[2], before[2])
         self.assertEqual(after[5], before[5])
 
+    def test_nonexistent_order_operations_are_handled_safely(self):
+        nonexistent_order_id = 999999
+
+        self.assertIsNone(orders.get_order(nonexistent_order_id))
+
+        with self.assertRaises(ValueError):
+            orders.recalculate_order_totals(nonexistent_order_id)
+
+        with self.assertRaises(ValueError):
+            orders.add_order_item(nonexistent_order_id, 1, 1)
+
+        with self.assertRaises(ValueError):
+            orders.complete_order(nonexistent_order_id, "Cash")
+
+        with self.assertRaises(ValueError):
+            orders.update_order_item_quantity(nonexistent_order_id, 1)
+
+        with self.assertRaises(ValueError):
+            orders.remove_order_item(nonexistent_order_id)
+
     def test_invalid_payment_is_rejected(self):
         order_id = orders.create_order()
         for payment in ("", "  ", None, 123, True):
