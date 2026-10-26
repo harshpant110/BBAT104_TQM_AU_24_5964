@@ -49,7 +49,7 @@ def update_menu_item(item_id, name, category, price, available):
     connection = get_connection()
 
     try:
-        connection.execute(
+        cursor = connection.execute(
             """
             UPDATE menu_items
             SET name = ?, category = ?, price = ?, available = ?
@@ -58,6 +58,7 @@ def update_menu_item(item_id, name, category, price, available):
             (name, category, price, int(available), item_id),
         )
         connection.commit()
+        return cursor.rowcount > 0
 
     except (sqlite3.Error, ValueError, TypeError):
         connection.rollback()
@@ -72,11 +73,12 @@ def delete_menu_item(item_id):
     connection = get_connection()
 
     try:
-        connection.execute(
+        cursor = connection.execute(
             "DELETE FROM menu_items WHERE id = ?",
             (item_id,),
         )
         connection.commit()
+        return cursor.rowcount > 0
 
     except sqlite3.Error:
         connection.rollback()
