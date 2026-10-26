@@ -23,6 +23,23 @@ from database.customers import (
     delete_customer,
 )
 
+from database.orders import (
+    create_order,
+    get_order,
+    recalculate_order_totals,
+    add_order_item,
+    update_order_item_quantity,
+    remove_order_item,
+    get_orders,
+    complete_order,
+)
+
+from database.reports import (
+    get_dashboard_stats,
+    get_daily_revenue,
+)
+
+
 __all__ = [
     "DATABASE_PATH",
     "DATA_DIR",
@@ -40,4 +57,14 @@ __all__ = [
     "add_customer",
     "update_customer",
     "delete_customer",
+    "create_order",
+    "get_order",
+    "recalculate_order_totals",
+    "add_order_item",
+    "update_order_item_quantity",
+    "remove_order_item",
+    "get_orders",
+    "complete_order",
+    "get_dashboard_stats",
+    "get_daily_revenue",
 ]
