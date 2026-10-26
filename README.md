@@ -60,7 +60,7 @@ GitHub repository:
 Run the regression suite from the repository root:
 
 ```bash
-PYTHONPATH=src:tests .venv/bin/python3 -m unittest discover -s tests -v
+PYTHONPATH=src:tests .venv314/bin/python3 -m unittest discover -s tests -v
 ```
 
 The tests use isolated in-memory SQLite databases and do not access

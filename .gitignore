@@ -7,3 +7,5 @@ __pycache__/
 
 database.txt
 
+.venv312/
+.venv314/
