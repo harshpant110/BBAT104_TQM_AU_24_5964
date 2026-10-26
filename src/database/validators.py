@@ -60,3 +60,22 @@ def validate_id(value, field_name="ID"):
         raise ValueError(f"{field_name} must be a positive integer.")
 
     return value
+
+
+def validate_menu_text(value, field_name):
+    """Ensure menu text fields are non-empty strings."""
+    if not isinstance(value, str) or not value.strip():
+        raise ValueError(f"{field_name} is required.")
+
+    return value.strip()
+
+
+def validate_availability(value):
+    """Accept only booleans or integer 0/1 for availability."""
+    if isinstance(value, bool):
+        return int(value)
+
+    if type(value) is int and value in (0, 1):
+        return value
+
+    raise ValueError("Availability must be True, False, 0, or 1.")
