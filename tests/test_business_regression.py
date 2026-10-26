@@ -107,6 +107,43 @@ class OrderRegressionTests(IsolatedDatabaseTestCase):
         self.assertEqual(after[2], before[2])
         self.assertEqual(after[5], before[5])
 
+    def test_completed_order_items_cannot_be_modified(self):
+        menu.add_menu_item("Locked Meal", "Meals", 100)
+        item_id = self.keepalive.execute(
+            "SELECT id FROM menu_items WHERE name = 'Locked Meal'"
+        ).fetchone()[0]
+        order_id = orders.create_order()
+        orders.add_order_item(order_id, item_id, 2)
+        orders.complete_order(order_id, "Cash")
+
+        order_item_id = self.keepalive.execute(
+            "SELECT id FROM order_items WHERE order_id = ?",
+            (order_id,),
+        ).fetchone()[0]
+        before_order = orders.get_order(order_id)["order"]
+        before_quantity = self.keepalive.execute(
+            "SELECT quantity FROM order_items WHERE id = ?",
+            (order_item_id,),
+        ).fetchone()[0]
+
+        operations = (
+            lambda: orders.add_order_item(order_id, item_id, 1),
+            lambda: orders.update_order_item_quantity(order_item_id, 3),
+            lambda: orders.remove_order_item(order_item_id),
+        )
+        for operation in operations:
+            with self.subTest(operation=operation):
+                with self.assertRaises(ValueError):
+                    operation()
+
+        after_order = orders.get_order(order_id)["order"]
+        after_quantity = self.keepalive.execute(
+            "SELECT quantity FROM order_items WHERE id = ?",
+            (order_item_id,),
+        ).fetchone()[0]
+        self.assertEqual(after_order, before_order)
+        self.assertEqual(after_quantity, before_quantity)
+
     def test_failed_order_item_write_rolls_back(self):
         menu.add_menu_item("Rollback Meal", "Meals", 100)
         item_id = self.keepalive.execute(
