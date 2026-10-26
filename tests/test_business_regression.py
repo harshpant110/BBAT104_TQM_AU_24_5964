@@ -214,3 +214,76 @@ class ReportingRegressionTests(IsolatedDatabaseTestCase):
 
 if __name__ == "__main__":
     unittest.main(verbosity=2)
+
+    def test_daily_revenue_counts_only_completed_orders(self):
+        self.keepalive.execute(
+            """
+            INSERT INTO orders (subtotal, total, status, created_at)
+            VALUES
+                (100, 100, 'Completed', DATE('now')),
+                (50, 50, 'Pending', DATE('now')),
+                (75, 75, 'Completed', DATE('now', '-10 days'))
+            """
+        )
+        self.keepalive.commit()
+
+        revenue = reports.get_daily_revenue(days=7)
+
+        self.assertEqual(len(revenue), 1)
+        self.assertEqual(revenue[0][1], 100.0)
+
+
+class OrderQueryRegressionTests(IsolatedDatabaseTestCase):
+    def test_get_orders_includes_customer_names_and_orders_newest_first(self):
+        customers.add_customer("Asha")
+        customer_id = self.keepalive.execute(
+            "SELECT id FROM customers WHERE name = 'Asha'"
+        ).fetchone()[0]
+
+        self.keepalive.execute(
+            """
+            INSERT INTO orders (customer_id, total, status, created_at)
+            VALUES
+                (?, 100, 'Completed', '2026-01-01 10:00:00'),
+                (NULL, 50, 'Pending', '2026-01-02 10:00:00')
+            """,
+            (customer_id,),
+        )
+        self.keepalive.commit()
+
+        result = orders.get_orders()
+
+        self.assertEqual(len(result), 2)
+        self.assertEqual(result[0][2], None)
+        self.assertEqual(result[0][6], 50.0)
+        self.assertEqual(result[1][2], "Asha")
+        self.assertEqual(result[1][6], 100.0)
+
+
+class SchemaInitializationRegressionTests(IsolatedDatabaseTestCase):
+    def test_database_initialization_is_idempotent(self):
+        customers.add_customer("Existing Customer")
+        before = self.keepalive.execute(
+            "SELECT COUNT(*) FROM customers"
+        ).fetchone()[0]
+
+        from database import schema
+        schema.initialize_database()
+        schema.initialize_database()
+
+        after = self.keepalive.execute(
+            "SELECT COUNT(*) FROM customers"
+        ).fetchone()[0]
+
+        self.assertEqual(before, 1)
+        self.assertEqual(after, 1)
+
+        tables = {
+            row[0]
+            for row in self.keepalive.execute(
+                "SELECT name FROM sqlite_master WHERE type = 'table'"
+            ).fetchall()
+        }
+        self.assertTrue(
+            {"customers", "menu_items", "orders", "order_items"}.issubset(tables)
+        )
