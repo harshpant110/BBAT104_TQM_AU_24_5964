@@ -4,6 +4,17 @@ from database.connection import get_connection
 from database.validators import validate_customer_name
 
 
+def _normalize_optional_text(value, field_name):
+    """Normalize optional text fields and reject non-string values."""
+    if value is None:
+        return None
+
+    if not isinstance(value, str):
+        raise ValueError(f"{field_name} must be text.")
+
+    return value.strip() or None
+
+
 def get_customers():
     """Return all customers ordered by name."""
     connection = get_connection()
@@ -23,8 +34,8 @@ def get_customers():
 def add_customer(name, phone=None, email=None):
     """Add a customer to the database."""
     name = validate_customer_name(name)
-    phone = phone.strip() or None if isinstance(phone, str) else phone
-    email = email.strip() or None if isinstance(email, str) else email
+    phone = _normalize_optional_text(phone, "Phone")
+    email = _normalize_optional_text(email, "Email")
 
     connection = get_connection()
 
@@ -49,8 +60,8 @@ def add_customer(name, phone=None, email=None):
 def update_customer(customer_id, name, phone=None, email=None):
     """Update an existing customer's details."""
     name = validate_customer_name(name)
-    phone = phone.strip() or None if isinstance(phone, str) else phone
-    email = email.strip() or None if isinstance(email, str) else email
+    phone = _normalize_optional_text(phone, "Phone")
+    email = _normalize_optional_text(email, "Email")
 
     connection = get_connection()
 
