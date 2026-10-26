@@ -34,7 +34,8 @@ def initialize_database():
                 discount REAL NOT NULL DEFAULT 0 CHECK (discount >= 0),
                 total REAL NOT NULL DEFAULT 0 CHECK (total >= 0),
                 payment_method TEXT,
-                status TEXT NOT NULL DEFAULT 'Pending',
+                status TEXT NOT NULL DEFAULT 'Pending'
+                    CHECK (status IN ('Pending', 'Completed')),
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                 FOREIGN KEY (customer_id) REFERENCES customers(id)
                     ON DELETE SET NULL
@@ -51,6 +52,20 @@ def initialize_database():
                 FOREIGN KEY (menu_item_id) REFERENCES menu_items(id)
                     ON DELETE RESTRICT
             );
+
+            CREATE TRIGGER IF NOT EXISTS orders_status_insert_guard
+            BEFORE INSERT ON orders
+            WHEN NEW.status NOT IN ('Pending', 'Completed')
+            BEGIN
+                SELECT RAISE(ABORT, 'Invalid order status');
+            END;
+
+            CREATE TRIGGER IF NOT EXISTS orders_status_update_guard
+            BEFORE UPDATE OF status ON orders
+            WHEN NEW.status NOT IN ('Pending', 'Completed')
+            BEGIN
+                SELECT RAISE(ABORT, 'Invalid order status');
+            END;
             """
         )
         connection.commit()
