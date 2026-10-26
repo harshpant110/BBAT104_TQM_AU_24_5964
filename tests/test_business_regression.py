@@ -1,4 +1,5 @@
 import unittest
+from unittest.mock import patch
 
 from test_database_integrity import IsolatedDatabaseTestCase
 from database import customers, menu, orders, reports
@@ -101,6 +102,31 @@ class OrderRegressionTests(IsolatedDatabaseTestCase):
 
         with self.assertRaises(ValueError):
             orders.add_order_item(order_id, item_id, 0)
+
+        after = orders.get_order(order_id)["order"]
+        self.assertEqual(after[2], before[2])
+        self.assertEqual(after[5], before[5])
+
+    def test_failed_order_item_write_rolls_back(self):
+        menu.add_menu_item("Rollback Meal", "Meals", 100)
+        item_id = self.keepalive.execute(
+            "SELECT id FROM menu_items WHERE name = 'Rollback Meal'"
+        ).fetchone()[0]
+        order_id = orders.create_order()
+        before = orders.get_order(order_id)["order"]
+
+        with patch(
+            "database.orders._update_order_totals",
+            side_effect=TypeError("injected recalculation failure"),
+        ):
+            with self.assertRaises(TypeError):
+                orders.add_order_item(order_id, item_id, 1)
+
+        item_count = self.keepalive.execute(
+            "SELECT COUNT(*) FROM order_items WHERE order_id = ?",
+            (order_id,),
+        ).fetchone()[0]
+        self.assertEqual(item_count, 0)
 
         after = orders.get_order(order_id)["order"]
         self.assertEqual(after[2], before[2])
