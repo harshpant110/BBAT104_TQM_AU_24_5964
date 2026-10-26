@@ -1,11 +1,13 @@
 import sqlite3
 
 from database.connection import get_connection
-from database.validators import validate_money, validate_quantity
+from database.validators import validate_id, validate_money, validate_quantity
 
 
 def create_order(customer_id=None):
     """Create a pending order for an optional existing customer."""
+    if customer_id is not None:
+        validate_id(customer_id, "Customer ID")
     connection = get_connection()
 
     try:
@@ -39,6 +41,7 @@ def create_order(customer_id=None):
 
 def get_order(order_id):
     """Return an order and its line items, or None if it does not exist."""
+    validate_id(order_id, "Order ID")
     connection = get_connection()
 
     try:
@@ -130,6 +133,7 @@ def _update_order_totals(connection, order_id, tax=None, discount=None):
 
 def recalculate_order_totals(order_id, tax=0, discount=0):
     """Set tax and discount, then recalculate the order totals."""
+    validate_id(order_id, "Order ID")
     tax = validate_money(tax, "Tax")
     discount = validate_money(discount, "Discount")
     connection = get_connection()
@@ -151,6 +155,8 @@ def recalculate_order_totals(order_id, tax=0, discount=0):
 
 def add_order_item(order_id, menu_item_id, quantity):
     """Add an available menu item to a pending order."""
+    validate_id(order_id, "Order ID")
+    validate_id(menu_item_id, "Menu item ID")
     quantity = validate_quantity(quantity)
     connection = get_connection()
 
@@ -202,6 +208,7 @@ def add_order_item(order_id, menu_item_id, quantity):
 
 def update_order_item_quantity(order_item_id, quantity):
     """Change an item quantity and update its order totals."""
+    validate_id(order_item_id, "Order item ID")
     quantity = validate_quantity(quantity)
     connection = get_connection()
 
@@ -240,6 +247,7 @@ def update_order_item_quantity(order_item_id, quantity):
 
 def remove_order_item(order_item_id):
     """Remove an item and update its order totals."""
+    validate_id(order_item_id, "Order item ID")
     connection = get_connection()
 
     try:
@@ -297,6 +305,7 @@ def get_orders():
 
 def complete_order(order_id, payment_method):
     """Complete a pending order after validating its payment method."""
+    validate_id(order_id, "Order ID")
     if not isinstance(payment_method, str) or not payment_method.strip():
         raise ValueError("Payment method is required.")
 

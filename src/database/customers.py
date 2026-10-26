@@ -1,7 +1,7 @@
 import sqlite3
 
 from database.connection import get_connection
-from database.validators import validate_customer_name
+from database.validators import validate_customer_name, validate_id
 
 
 def _normalize_optional_text(value, field_name):
@@ -59,6 +59,7 @@ def add_customer(name, phone=None, email=None):
 
 def update_customer(customer_id, name, phone=None, email=None):
     """Update an existing customer's details."""
+    validate_id(customer_id, "Customer ID")
     name = validate_customer_name(name)
     phone = _normalize_optional_text(phone, "Phone")
     email = _normalize_optional_text(email, "Email")
@@ -87,6 +88,7 @@ def update_customer(customer_id, name, phone=None, email=None):
 
 def delete_customer(customer_id):
     """Delete a customer; linked orders retain their history."""
+    validate_id(customer_id, "Customer ID")
     connection = get_connection()
 
     try:

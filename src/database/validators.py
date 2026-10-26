@@ -52,3 +52,11 @@ def validate_money(amount, field_name="Amount"):
         )
 
     return round(amount, 2)
+
+
+def validate_id(value, field_name="ID"):
+    """Ensure a database ID is a positive integer, excluding booleans."""
+    if isinstance(value, bool) or not isinstance(value, int) or value <= 0:
+        raise ValueError(f"{field_name} must be a positive integer.")
+
+    return value

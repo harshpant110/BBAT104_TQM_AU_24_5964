@@ -1,7 +1,7 @@
 import sqlite3
 
 from database.connection import get_connection
-from database.validators import validate_menu_price
+from database.validators import validate_menu_price, validate_id
 
 
 def get_menu_items():
@@ -45,6 +45,7 @@ def add_menu_item(name, category, price, available=True):
 
 def update_menu_item(item_id, name, category, price, available):
     """Update an existing menu item."""
+    validate_id(item_id, "Menu item ID")
     price = validate_menu_price(price)
     connection = get_connection()
 
@@ -70,6 +71,7 @@ def update_menu_item(item_id, name, category, price, available):
 
 def delete_menu_item(item_id):
     """Delete a menu item."""
+    validate_id(item_id, "Menu item ID")
     connection = get_connection()
 
     try:
