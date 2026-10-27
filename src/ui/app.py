@@ -5,11 +5,12 @@ from ui.pages.calendar import CalendarPage
 from ui.pages.billing import BillingPage
 from ui.pages.settings import SettingsPage
 
-from database import get_dashboard_stats, get_orders, get_popular_items
+from database import (get_dashboard_stats, get_daily_revenue, get_orders, get_popular_items)
 
 import customtkinter as ctk
 
 from ui.theme import COLORS, DARK_COLORS, FONTS, SIZES
+from datetime import date, timedelta
 
 
 class RestaurantBillingApp(ctk.CTk):
@@ -299,322 +300,365 @@ class RestaurantBillingApp(ctk.CTk):
 
 
     def create_dashboard(self):
-        container = ctk.CTkFrame(
+        container = ctk.CTkScrollableFrame(
             self.content_frame,
             fg_color="transparent",
+            corner_radius=0,
         )
         container.pack(fill="both", expand=True)
 
-        welcome = ctk.CTkLabel(
-            container,
+        # Dashboard heading and quick actions
+        top = ctk.CTkFrame(container, fg_color="transparent")
+        top.pack(fill="x", pady=(4, 20))
+        top.grid_columnconfigure(0, weight=1)
+
+        ctk.CTkLabel(
+            top,
             text="Good evening, Administrator",
             font=ctk.CTkFont(
-                family=FONTS["heading"][0],
-                size=22,
-                weight="bold",
+                family=FONTS["heading"][0], size=24, weight="bold"
             ),
             text_color=self.colors["text_primary"],
-        )
-        welcome.pack(anchor="w", pady=(5, 3))
+        ).grid(row=0, column=0, sticky="w")
 
-        subtitle = ctk.CTkLabel(
-            container,
-            text="Here is an overview of your restaurant today.",
-            font=ctk.CTkFont(
-                family=FONTS["body"][0],
-                size=13,
-            ),
+        ctk.CTkLabel(
+            top,
+            text="Your restaurant at a glance",
+            font=ctk.CTkFont(family=FONTS["body"][0], size=12),
             text_color=self.colors["text_secondary"],
-        )
-        subtitle.pack(anchor="w", pady=(0, 25))
+        ).grid(row=1, column=0, sticky="w", pady=(4, 0))
 
-        cards_frame = ctk.CTkFrame(
-            container,
-            fg_color="transparent",
-        )
-        cards_frame.pack(fill="x")
+        ctk.CTkButton(
+            top,
+            text="+ New Bill",
+            width=112,
+            height=38,
+            fg_color=self.colors["success"],
+            hover_color=self.colors["success"],
+            command=lambda: self.show_page("Billing"),
+        ).grid(row=0, column=1, rowspan=2, padx=(12, 0))
+
+        ctk.CTkButton(
+            top,
+            text="Manage Menu",
+            width=120,
+            height=38,
+            fg_color=self.colors["accent"],
+            hover_color=self.colors["accent_hover"],
+            command=lambda: self.show_page("Menu"),
+        ).grid(row=0, column=2, rowspan=2, padx=(8, 0))
 
         stats = get_dashboard_stats()
 
-        cards = [
-            (
-                "Completed Revenue",
-                f"₹{stats['completed_revenue']:,.2f}",
-                "Revenue from completed orders",
-            ),
-            (
-                "Total Orders",
-                str(stats["total_orders"]),
-                f"{stats['completed_orders']} completed",
-            ),
-            (
-                "Pending Orders",
-                str(stats["pending_orders"]),
-                "Awaiting completion",
-            ),
-            (
-                "Customers",
-                str(stats["customers"]),
-                "Registered customers",
-            ),
+        # KPI cards use existing dashboard statistics.
+        card_data = [
+            ("COMPLETED REVENUE", f"₹{stats['completed_revenue']:,.2f}",
+             "From completed orders", "#2F65E8"),
+            ("TOTAL ORDERS", str(stats["total_orders"]),
+             f"{stats['completed_orders']} completed", "#16A34A"),
+            ("PENDING ORDERS", str(stats["pending_orders"]),
+             "Awaiting completion", "#D97706"),
+            ("CUSTOMERS", str(stats["customers"]),
+             "Registered customers", "#8B5CF6"),
         ]
 
-        for title, value, description in cards:
+        cards = ctk.CTkFrame(container, fg_color="transparent")
+        cards.pack(fill="x")
+        for column in range(4):
+            cards.grid_columnconfigure(column, weight=1, uniform="kpi")
+
+        for column, (title, value, description, accent) in enumerate(card_data):
             card = ctk.CTkFrame(
-                cards_frame,
+                cards,
                 fg_color=self.colors["surface"],
-                corner_radius=SIZES["card_radius"],
+                corner_radius=14,
                 border_width=1,
                 border_color=self.colors["border"],
             )
-            card.pack(
-                side="left",
-                fill="both",
-                expand=True,
-                padx=(0, 12),
+            card.grid(
+                row=0, column=column, sticky="nsew",
+                padx=(0 if column == 0 else 6, 0 if column == 3 else 6),
+                pady=2,
             )
+
+            ctk.CTkFrame(
+                card, height=4, fg_color=accent, corner_radius=2
+            ).pack(fill="x", padx=15, pady=(14, 10))
 
             ctk.CTkLabel(
                 card,
                 text=title,
-                font=ctk.CTkFont(
-                    family=FONTS["small"][0],
-                    size=12,
-                ),
+                font=ctk.CTkFont(family=FONTS["small"][0], size=10, weight="bold"),
                 text_color=self.colors["text_secondary"],
-            ).pack(anchor="w", padx=18, pady=(18, 5))
+            ).pack(anchor="w", padx=15)
 
             ctk.CTkLabel(
                 card,
                 text=value,
-                font=ctk.CTkFont(
-                    family=FONTS["title"][0],
-                    size=24,
-                    weight="bold",
-                ),
+                font=ctk.CTkFont(family=FONTS["title"][0], size=23, weight="bold"),
                 text_color=self.colors["text_primary"],
-            ).pack(anchor="w", padx=18)
+            ).pack(anchor="w", padx=15, pady=(5, 2))
 
             ctk.CTkLabel(
                 card,
                 text=description,
-                font=ctk.CTkFont(
-                    family=FONTS["small"][0],
-                    size=11,
-                ),
+                font=ctk.CTkFont(family=FONTS["small"][0], size=10),
                 text_color=self.colors["text_secondary"],
-            ).pack(anchor="w", padx=18, pady=(2, 18))
+            ).pack(anchor="w", padx=15, pady=(0, 15))
 
-        lower_frame = ctk.CTkFrame(
-            container,
-            fg_color="transparent",
-        )
-        lower_frame.pack(
-            fill="both",
-            expand=True,
-            pady=(20, 0),
-        )
+        # Analytics row: real daily revenue and best-selling items.
+        analytics = ctk.CTkFrame(container, fg_color="transparent")
+        analytics.pack(fill="x", pady=(18, 0))
+        analytics.grid_columnconfigure(0, weight=3, uniform="analytics")
+        analytics.grid_columnconfigure(1, weight=2, uniform="analytics")
 
-        recent_orders = ctk.CTkFrame(
-            lower_frame,
+        revenue_card = ctk.CTkFrame(
+            analytics,
             fg_color=self.colors["surface"],
-            corner_radius=SIZES["card_radius"],
+            corner_radius=14,
             border_width=1,
             border_color=self.colors["border"],
         )
-        recent_orders.pack(
-            side="left",
-            fill="both",
-            expand=True,
-            padx=(0, 10),
-        )
+        revenue_card.grid(row=0, column=0, sticky="nsew", padx=(0, 6))
 
         ctk.CTkLabel(
-            recent_orders,
-            text="Recent Orders",
-            font=ctk.CTkFont(
-                family=FONTS["subheading"][0],
-                size=15,
-                weight="bold",
-            ),
+            revenue_card,
+            text="Revenue Trend",
+            font=ctk.CTkFont(family=FONTS["subheading"][0], size=15, weight="bold"),
             text_color=self.colors["text_primary"],
-        ).pack(anchor="w", padx=20, pady=(20, 10))
+        ).pack(anchor="w", padx=18, pady=(16, 3))
 
-        orders = get_orders()[:5]
+        ctk.CTkLabel(
+            revenue_card,
+            text="Completed orders · Last 7 days",
+            font=ctk.CTkFont(family=FONTS["small"][0], size=10),
+            text_color=self.colors["text_secondary"],
+        ).pack(anchor="w", padx=18, pady=(0, 12))
 
-        if not orders:
+        revenue_rows = get_daily_revenue(days=7)
+        revenue_by_day = {
+            str(day): float(amount or 0)
+            for day, amount in revenue_rows
+        }
+
+        today = date.today()
+        revenue_values = [
+            (
+                (today - timedelta(days=offset)).isoformat(),
+                revenue_by_day.get(
+                    (today - timedelta(days=offset)).isoformat(),
+                    0.0,
+                ),
+            )
+            for offset in range(6, -1, -1)
+        ]
+        max_revenue = max((amount for _, amount in revenue_values), default=0)
+
+        if not revenue_values or max_revenue <= 0:
             ctk.CTkLabel(
-                recent_orders,
-                text="No orders yet. Create your first order in Billing.",
-                font=ctk.CTkFont(
-                    family=FONTS["small"][0],
-                    size=12,
-                ),
+                revenue_card,
+                text="No completed-order revenue recorded in this period.",
+                font=ctk.CTkFont(family=FONTS["body"][0], size=12),
                 text_color=self.colors["text_secondary"],
-                wraplength=400,
-            ).pack(anchor="w", padx=20, pady=12)
+            ).pack(anchor="w", padx=18, pady=(8, 22))
         else:
-            for order in orders:
-                (
-                    order_id,
-                    _customer_id,
-                    customer_name,
-                    _subtotal,
-                    _tax,
-                    _discount,
-                    total,
-                    _payment_method,
-                    status,
-                    created_at,
-                ) = order
-
-                row = ctk.CTkFrame(
-                    recent_orders,
-                    fg_color="transparent",
-                )
-                row.pack(
-                    fill="x",
-                    padx=16,
-                    pady=6,
-                )
-                row.grid_columnconfigure(0, weight=1)
-
-                details = ctk.CTkFrame(
-                    row,
-                    fg_color="transparent",
-                )
-                details.pack(
-                    side="left",
-                    fill="x",
-                    expand=True,
-                )
+            for day, amount in revenue_values:
+                bar_row = ctk.CTkFrame(revenue_card, fg_color="transparent")
+                bar_row.pack(fill="x", padx=18, pady=5)
+                bar_row.grid_columnconfigure(1, weight=1)
 
                 ctk.CTkLabel(
-                    details,
-                    text=(
-                        f"Order #{order_id} · "
-                        f"{customer_name or 'Walk-in customer'}"
-                    ),
-                    font=ctk.CTkFont(
-                        family=FONTS["body"][0],
-                        size=12,
-                        weight="bold",
-                    ),
-                    text_color=self.colors["text_primary"],
+                    bar_row,
+                    text=day[5:],
+                    width=44,
                     anchor="w",
-                    wraplength=300,
-                ).pack(anchor="w")
-
-                ctk.CTkLabel(
-                    details,
-                    text=str(created_at),
-                    font=ctk.CTkFont(
-                        family=FONTS["small"][0],
-                        size=10,
-                    ),
+                    font=ctk.CTkFont(family=FONTS["small"][0], size=10),
                     text_color=self.colors["text_secondary"],
-                    anchor="w",
-                ).pack(anchor="w", pady=(2, 0))
+                ).grid(row=0, column=0, padx=(0, 8))
 
-                right = ctk.CTkFrame(
-                    row,
-                    fg_color="transparent",
+                bar = ctk.CTkProgressBar(
+                    bar_row,
+                    height=10,
+                    corner_radius=5,
+                    fg_color=self.colors["border"],
+                    progress_color=self.colors["accent"],
                 )
-                right.pack(side="right", padx=(8, 0))
+                bar.grid(row=0, column=1, sticky="ew", padx=(0, 10))
+                bar.set(amount / max_revenue)
 
                 ctk.CTkLabel(
-                    right,
-                    text=f"₹{total:,.2f}",
-                    font=ctk.CTkFont(
-                        family=FONTS["body"][0],
-                        size=12,
-                        weight="bold",
-                    ),
+                    bar_row,
+                    text=f"₹{amount:,.0f}",
+                    width=78,
+                    anchor="e",
+                    font=ctk.CTkFont(family=FONTS["small"][0], size=10),
                     text_color=self.colors["text_primary"],
-                ).pack(anchor="e")
+                ).grid(row=0, column=2)
 
-                ctk.CTkLabel(
-                    right,
-                    text=status,
-                    font=ctk.CTkFont(
-                        family=FONTS["small"][0],
-                        size=10,
-                    ),
-                    text_color=(
-                        self.colors["accent"]
-                        if status == "Completed"
-                        else self.colors["text_secondary"]
-                    ),
-                ).pack(anchor="e", pady=(2, 0))
+            ctk.CTkFrame(revenue_card, height=8, fg_color="transparent").pack()
 
-        popular_items = ctk.CTkFrame(
-            lower_frame,
+        popular_card = ctk.CTkFrame(
+            analytics,
             fg_color=self.colors["surface"],
-            corner_radius=SIZES["card_radius"],
+            corner_radius=14,
             border_width=1,
             border_color=self.colors["border"],
         )
-        popular_items.pack(
-            side="left",
-            fill="both",
-            expand=True,
-            padx=(10, 0),
-        )
+        popular_card.grid(row=0, column=1, sticky="nsew", padx=(6, 0))
 
         ctk.CTkLabel(
-            popular_items,
+            popular_card,
             text="Popular Items",
-            font=ctk.CTkFont(
-                family=FONTS["subheading"][0],
-                size=15,
-                weight="bold",
-            ),
+            font=ctk.CTkFont(family=FONTS["subheading"][0], size=15, weight="bold"),
             text_color=self.colors["text_primary"],
-        ).pack(anchor="w", padx=20, pady=(20, 5))
+        ).pack(anchor="w", padx=18, pady=(16, 12))
 
         popular = get_popular_items(limit=5)
+        max_sold = max((int(quantity or 0) for _, quantity in popular), default=0)
 
         if not popular:
             ctk.CTkLabel(
-                popular_items,
+                popular_card,
                 text="No sales yet. Complete an order to see popular items.",
-                font=ctk.CTkFont(
-                    family=FONTS["small"][0],
-                    size=12,
-                ),
+                wraplength=250,
+                font=ctk.CTkFont(family=FONTS["body"][0], size=12),
                 text_color=self.colors["text_secondary"],
-                wraplength=300,
-            ).pack(anchor="w", padx=20, pady=10)
+            ).pack(anchor="w", padx=18, pady=(4, 20))
         else:
-            for rank, (item_name, quantity_sold) in enumerate(
-                popular,
-                start=1,
-            ):
-                item_row = ctk.CTkFrame(
-                    popular_items,
-                    fg_color="transparent",
-                )
-                item_row.pack(fill="x", padx=20, pady=5)
+            for rank, (item_name, quantity_sold) in enumerate(popular, start=1):
+                item_row = ctk.CTkFrame(popular_card, fg_color="transparent")
+                item_row.pack(fill="x", padx=18, pady=5)
+                item_row.grid_columnconfigure(0, weight=1)
 
                 ctk.CTkLabel(
                     item_row,
                     text=f"{rank}. {item_name}",
-                    font=ctk.CTkFont(
-                        family=FONTS["body"][0],
-                        size=12,
-                    ),
+                    font=ctk.CTkFont(family=FONTS["body"][0], size=12),
                     text_color=self.colors["text_primary"],
-                ).pack(side="left")
+                    anchor="w",
+                ).grid(row=0, column=0, sticky="w")
 
                 ctk.CTkLabel(
                     item_row,
                     text=f"{quantity_sold} sold",
-                    font=ctk.CTkFont(
-                        family=FONTS["small"][0],
-                        size=12,
-                    ),
+                    font=ctk.CTkFont(family=FONTS["small"][0], size=10),
                     text_color=self.colors["text_secondary"],
-                ).pack(side="right")
+                ).grid(row=0, column=1, sticky="e")
+
+                progress = ctk.CTkProgressBar(
+                    popular_card,
+                    height=7,
+                    corner_radius=4,
+                    fg_color=self.colors["border"],
+                    progress_color=self.colors["accent"],
+                )
+                progress.pack(fill="x", padx=18, pady=(1, 5))
+                progress.set((int(quantity_sold or 0) / max_sold) if max_sold else 0)
+
+        # Recent orders retain the existing order query and record fields.
+        recent_card = ctk.CTkFrame(
+            container,
+            fg_color=self.colors["surface"],
+            corner_radius=14,
+            border_width=1,
+            border_color=self.colors["border"],
+        )
+        recent_card.pack(fill="x", pady=(18, 8))
+
+        recent_header = ctk.CTkFrame(recent_card, fg_color="transparent")
+        recent_header.pack(fill="x", padx=18, pady=(15, 8))
+        recent_header.grid_columnconfigure(0, weight=1)
+
+        ctk.CTkLabel(
+            recent_header,
+            text="Recent Orders",
+            font=ctk.CTkFont(family=FONTS["subheading"][0], size=15, weight="bold"),
+            text_color=self.colors["text_primary"],
+        ).grid(row=0, column=0, sticky="w")
+
+        ctk.CTkButton(
+            recent_header,
+            text="View Orders",
+            width=95,
+            height=30,
+            fg_color="transparent",
+            border_width=1,
+            border_color=self.colors["border"],
+            text_color=self.colors["text_primary"],
+            hover_color=self.colors["sidebar_hover"],
+            command=lambda: self.show_page("Orders"),
+        ).grid(row=0, column=1, sticky="e")
+
+        table_head = ctk.CTkFrame(
+            recent_card, fg_color=self.colors["sidebar_hover"], corner_radius=6
+        )
+        table_head.pack(fill="x", padx=12, pady=(0, 4))
+        for column, weight in enumerate((1, 3, 1, 1)):
+            table_head.grid_columnconfigure(column, weight=weight)
+
+        for column, label in enumerate(("ORDER", "CUSTOMER / DATE", "STATUS", "TOTAL")):
+            ctk.CTkLabel(
+                table_head,
+                text=label,
+                font=ctk.CTkFont(family=FONTS["small"][0], size=10, weight="bold"),
+                text_color=self.colors["text_secondary"],
+                anchor="w" if column < 2 else "e",
+            ).grid(
+                row=0, column=column, sticky="ew",
+                padx=10, pady=10,
+            )
+
+        orders = get_orders()[:5]
+        if not orders:
+            ctk.CTkLabel(
+                recent_card,
+                text="No orders yet. Create your first bill to get started.",
+                font=ctk.CTkFont(family=FONTS["body"][0], size=12),
+                text_color=self.colors["text_secondary"],
+            ).pack(anchor="w", padx=20, pady=18)
+        else:
+            for index, order in enumerate(orders):
+                (
+                    order_id, _customer_id, customer_name, _subtotal,
+                    _tax, _discount, total, _payment_method, status, created_at,
+                ) = order
+
+                row = ctk.CTkFrame(
+                    recent_card,
+                    fg_color="transparent" if index % 2 == 0 else self.colors["background"],
+                    corner_radius=5,
+                )
+                row.pack(fill="x", padx=12, pady=2)
+                for column, weight in enumerate((1, 3, 1, 1)):
+                    row.grid_columnconfigure(column, weight=weight)
+
+                values = (
+                    f"#{order_id}",
+                    f"{customer_name or 'Walk-in customer'}  ·  {created_at}",
+                    status,
+                    f"₹{total:,.2f}",
+                )
+                for column, value in enumerate(values):
+                    status_color = (
+                        self.colors["success"] if status == "Completed"
+                        else self.colors["warning"] if status == "Pending"
+                        else self.colors["text_secondary"]
+                    ) if column == 2 else self.colors["text_primary"]
+
+                    ctk.CTkLabel(
+                        row,
+                        text=str(value),
+                        font=ctk.CTkFont(
+                            family=FONTS["body"][0],
+                            size=11,
+                            weight="bold" if column in (0, 3) else "normal",
+                        ),
+                        text_color=status_color,
+                        anchor="w" if column < 2 else "e",
+                    ).grid(
+                        row=0, column=column, sticky="ew",
+                        padx=10, pady=11,
+                    )
 
     def create_placeholder(self, page_name):
         card = ctk.CTkFrame(
