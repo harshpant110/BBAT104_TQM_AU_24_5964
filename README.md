@@ -71,3 +71,8 @@ data/restaurant.db.
 The project risk register documents failure modes, provisional RPN scores, corrective actions, and validation evidence.
 
 - [Failure Mode and Effects Analysis (FMEA)](docs/FMEA.md)
+
+## TQM Quality Control
+
+- [Defect Log](docs/DEFECT_LOG.md)
+- [SQC Test Execution Checksheet](docs/SQC_CHECKSHEET.md)
