@@ -76,3 +76,10 @@ The project risk register documents failure modes, provisional RPN scores, corre
 
 - [Defect Log](docs/DEFECT_LOG.md)
 - [SQC Test Execution Checksheet](docs/SQC_CHECKSHEET.md)
+
+## TQM Process Improvement
+
+- [Critical to Quality (CTQ)](docs/CTQ.md)
+- [SIPOC](docs/SIPOC.md)
+- [Fishbone Analysis](docs/FISHBONE.md)
+- [PDCA Continuous Improvement](docs/PDCA.md)
