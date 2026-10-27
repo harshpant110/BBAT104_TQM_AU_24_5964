@@ -62,6 +62,189 @@ class MenuRegressionTests(IsolatedDatabaseTestCase):
 
 
 class OrderRegressionTests(IsolatedDatabaseTestCase):
+    def test_atomic_multi_item_order_completes_successfully(self):
+        menu.add_menu_item("Meal One", "Meals", 100)
+        menu.add_menu_item("Meal Two", "Meals", 50)
+        menu_ids = dict(
+            self.keepalive.execute(
+                "SELECT name, id FROM menu_items"
+            ).fetchall()
+        )
+
+        order_id, totals = orders.create_completed_order(
+            None,
+            (
+                item
+                for item in (
+                    (menu_ids["Meal One"], 2),
+                    (menu_ids["Meal Two"], 3),
+                )
+            ),
+            tax=10,
+            discount=5,
+            payment_method="  Card  ",
+        )
+
+        record = orders.get_order(order_id)
+        self.assertEqual(record["order"][2:8], (350.0, 10.0, 5.0, 355.0, "Card", "Completed"))
+        self.assertEqual(len(record["items"]), 2)
+        self.assertEqual(totals, {
+            "subtotal": 350.0,
+            "tax": 10.0,
+            "discount": 5.0,
+            "total": 355.0,
+        })
+
+    def test_empty_item_generator_does_not_create_order(self):
+        with self.assertRaises(ValueError):
+            orders.create_completed_order(
+                None,
+                (item for item in ()),
+                tax=0,
+                discount=0,
+                payment_method="Cash",
+            )
+
+        self.assertEqual(
+            self.keepalive.execute("SELECT COUNT(*) FROM orders").fetchone()[0],
+            0,
+        )
+        self.assertEqual(
+            self.keepalive.execute("SELECT COUNT(*) FROM order_items").fetchone()[0],
+            0,
+        )
+
+    def test_atomic_order_rolls_back_when_second_item_fails(self):
+        menu.add_menu_item("Meal One", "Meals", 100)
+        menu.add_menu_item("Meal Two", "Meals", 50)
+        menu_ids = dict(
+            self.keepalive.execute(
+                "SELECT name, id FROM menu_items"
+            ).fetchall()
+        )
+        original_insert = orders._insert_order_item
+        insert_count = 0
+
+        def fail_on_second_insert(connection, order_id, menu_item_id, quantity):
+            nonlocal insert_count
+            insert_count += 1
+            if insert_count == 2:
+                raise RuntimeError("injected second item failure")
+            return original_insert(connection, order_id, menu_item_id, quantity)
+
+        with patch(
+            "database.orders._insert_order_item",
+            side_effect=fail_on_second_insert,
+        ):
+            with self.assertRaises(RuntimeError):
+                orders.create_completed_order(
+                    None,
+                    [
+                        (menu_ids["Meal One"], 1),
+                        (menu_ids["Meal Two"], 1),
+                    ],
+                    tax=0,
+                    discount=0,
+                    payment_method="Cash",
+                )
+
+        self.assertEqual(insert_count, 2)
+        self.assertEqual(
+            self.keepalive.execute("SELECT COUNT(*) FROM orders").fetchone()[0],
+            0,
+        )
+        self.assertEqual(
+            self.keepalive.execute("SELECT COUNT(*) FROM order_items").fetchone()[0],
+            0,
+        )
+
+    def test_atomic_order_rolls_back_when_totals_calculation_fails(self):
+        menu.add_menu_item("Totals Failure Meal", "Meals", 100)
+        item_id = self.keepalive.execute(
+            "SELECT id FROM menu_items WHERE name = 'Totals Failure Meal'"
+        ).fetchone()[0]
+
+        with patch(
+            "database.orders._update_order_totals",
+            side_effect=RuntimeError("injected totals calculation failure"),
+        ):
+            with self.assertRaisesRegex(
+                RuntimeError, "injected totals calculation failure"
+            ):
+                orders.create_completed_order(
+                    None,
+                    [(item_id, 1)],
+                    tax=0,
+                    discount=0,
+                    payment_method="Cash",
+                )
+
+        self.assertEqual(
+            self.keepalive.execute("SELECT COUNT(*) FROM orders").fetchone()[0],
+            0,
+        )
+        self.assertEqual(
+            self.keepalive.execute(
+                "SELECT COUNT(*) FROM order_items"
+            ).fetchone()[0],
+            0,
+        )
+
+    def test_atomic_order_rolls_back_when_completion_update_fails(self):
+        menu.add_menu_item("Completion Failure Meal", "Meals", 100)
+        item_id = self.keepalive.execute(
+            "SELECT id FROM menu_items WHERE name = 'Completion Failure Meal'"
+        ).fetchone()[0]
+
+        original_get_connection = orders.get_connection
+
+        class CompletionFailureConnection:
+            def __init__(self, connection):
+                self.connection = connection
+
+            def execute(self, sql, parameters=()):
+                if "SET payment_method = ?, status = 'Completed'" in sql:
+                    raise RuntimeError("injected completion update failure")
+                return self.connection.execute(sql, parameters)
+
+            def commit(self):
+                return self.connection.commit()
+
+            def rollback(self):
+                return self.connection.rollback()
+
+            def close(self):
+                return self.connection.close()
+
+        def get_wrapped_connection():
+            return CompletionFailureConnection(original_get_connection())
+
+        with patch(
+            "database.orders.get_connection",
+            side_effect=get_wrapped_connection,
+        ):
+            with self.assertRaisesRegex(
+                RuntimeError, "injected completion update failure"
+            ):
+                orders.create_completed_order(
+                    None,
+                    [(item_id, 1)],
+                    tax=0,
+                    discount=0,
+                    payment_method="Cash",
+                )
+
+        self.assertEqual(
+            self.keepalive.execute("SELECT COUNT(*) FROM orders").fetchone()[0],
+            0,
+        )
+        self.assertEqual(
+            self.keepalive.execute(
+                "SELECT COUNT(*) FROM order_items"
+            ).fetchone()[0],
+            0,
+        )
+
     def test_order_totals_and_completion(self):
         menu.add_menu_item("Meal", "Meals", 100)
         item_id = self.keepalive.execute(

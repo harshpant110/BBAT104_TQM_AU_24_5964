@@ -4,10 +4,7 @@ from tkinter import messagebox
 from database import (
     get_menu_items,
     get_customers,
-    create_order,
-    add_order_item,
-    recalculate_order_totals,
-    complete_order,
+    create_completed_order,
 )
 from ui.theme import FONTS, SIZES
 
@@ -405,17 +402,21 @@ class BillingPage(ctk.CTkFrame):
         ):
             return
 
-        order_id = None
         try:
-            order_id = create_order(customer_id)
-            for item in self.cart.values():
-                add_order_item(order_id, item["id"], item["quantity"])
-            recalculate_order_totals(order_id, tax=tax, discount=discount)
-            complete_order(order_id, payment_method)
+            order_id, _totals = create_completed_order(
+                customer_id,
+                [
+                    (item["id"], item["quantity"])
+                    for item in self.cart.values()
+                ],
+                tax,
+                discount,
+                payment_method,
+            )
         except Exception as exc:
             messagebox.showerror(
                 "Could Not Complete Order",
-                f"{exc}\n\nThe order may remain pending if an earlier step succeeded.",
+                str(exc),
                 parent=self,
             )
             return

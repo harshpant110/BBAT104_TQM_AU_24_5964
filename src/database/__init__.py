@@ -25,6 +25,7 @@ from database.customers import (
 
 from database.orders import (
     create_order,
+    create_completed_order,
     get_order,
     recalculate_order_totals,
     add_order_item,
@@ -59,6 +60,7 @@ __all__ = [
     "update_customer",
     "delete_customer",
     "create_order",
+    "create_completed_order",
     "get_order",
     "recalculate_order_totals",
     "add_order_item",

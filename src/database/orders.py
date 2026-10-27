@@ -39,6 +39,107 @@ def create_order(customer_id=None):
         connection.close()
 
 
+def _insert_order_item(connection, order_id, menu_item_id, quantity):
+    """Insert one available menu item using the current transaction."""
+    menu_item = connection.execute(
+        """
+        SELECT price FROM menu_items
+        WHERE id = ? AND available = 1
+        """,
+        (menu_item_id,),
+    ).fetchone()
+
+    if menu_item is None:
+        raise ValueError("Menu item does not exist or is unavailable.")
+
+    unit_price = validate_money(menu_item[0], "Menu price")
+    connection.execute(
+        """
+        INSERT INTO order_items
+            (order_id, menu_item_id, quantity, unit_price)
+        VALUES (?, ?, ?, ?)
+        """,
+        (order_id, menu_item_id, quantity, unit_price),
+    )
+
+
+def create_completed_order(
+    customer_id, items, tax, discount, payment_method
+):
+    """Create and complete an order within one database transaction."""
+    if customer_id is not None:
+        validate_id(customer_id, "Customer ID")
+
+    try:
+        items = list(items)
+    except TypeError:
+        raise ValueError("Order items must be an iterable.") from None
+
+    if not items:
+        raise ValueError("An order must contain at least one item.")
+
+    validated_items = []
+    for item in items:
+        try:
+            menu_item_id, quantity = item
+        except (TypeError, ValueError):
+            raise ValueError("Order items must contain an item ID and quantity.") from None
+        validate_id(menu_item_id, "Menu item ID")
+        validated_items.append((menu_item_id, validate_quantity(quantity)))
+
+    tax = validate_money(tax, "Tax")
+    discount = validate_money(discount, "Discount")
+
+    if not isinstance(payment_method, str) or not payment_method.strip():
+        raise ValueError("Payment method is required.")
+    payment_method = payment_method.strip()
+
+    connection = get_connection()
+
+    try:
+        if customer_id is not None:
+            customer = connection.execute(
+                "SELECT id FROM customers WHERE id = ?",
+                (customer_id,),
+            ).fetchone()
+            if customer is None:
+                raise ValueError("The selected customer does not exist.")
+
+        cursor = connection.execute(
+            """
+            INSERT INTO orders (customer_id, status)
+            VALUES (?, 'Pending')
+            """,
+            (customer_id,),
+        )
+        order_id = cursor.lastrowid
+
+        for menu_item_id, quantity in validated_items:
+            _insert_order_item(connection, order_id, menu_item_id, quantity)
+
+        totals = _update_order_totals(
+            connection, order_id, tax=tax, discount=discount
+        )
+
+        connection.execute(
+            """
+            UPDATE orders
+            SET payment_method = ?, status = 'Completed'
+            WHERE id = ?
+            """,
+            (payment_method, order_id),
+        )
+        connection.commit()
+        return order_id, totals
+
+    except Exception:
+        connection.rollback()
+        raise
+
+    finally:
+        connection.close()
+
+
 def get_order(order_id):
     """Return an order and its line items, or None if it does not exist."""
     validate_id(order_id, "Order ID")
@@ -172,27 +273,7 @@ def add_order_item(order_id, menu_item_id, quantity):
         if order[0] != "Pending":
             raise ValueError("Items can only be added to pending orders.")
 
-        menu_item = connection.execute(
-            """
-            SELECT price FROM menu_items
-            WHERE id = ? AND available = 1
-            """,
-            (menu_item_id,),
-        ).fetchone()
-
-        if menu_item is None:
-            raise ValueError("Menu item does not exist or is unavailable.")
-
-        unit_price = validate_money(menu_item[0], "Menu price")
-
-        connection.execute(
-            """
-            INSERT INTO order_items
-                (order_id, menu_item_id, quantity, unit_price)
-            VALUES (?, ?, ?, ?)
-            """,
-            (order_id, menu_item_id, quantity, unit_price),
-        )
+        _insert_order_item(connection, order_id, menu_item_id, quantity)
 
         totals = _update_order_totals(connection, order_id)
         connection.commit()
