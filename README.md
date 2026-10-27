@@ -65,3 +65,9 @@ PYTHONPATH=src:tests .venv314/bin/python3 -m unittest discover -s tests -v
 
 The tests use isolated in-memory SQLite databases and do not access
 data/restaurant.db.
+
+## TQM Risk Analysis
+
+The project risk register documents failure modes, provisional RPN scores, corrective actions, and validation evidence.
+
+- [Failure Mode and Effects Analysis (FMEA)](docs/FMEA.md)
