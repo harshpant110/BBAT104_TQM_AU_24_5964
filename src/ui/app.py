@@ -1,4 +1,11 @@
 from ui.pages.menu import MenuPage
+from ui.pages.customers import CustomersPage
+from ui.pages.orders import OrdersPage
+from ui.pages.calendar import CalendarPage
+from ui.pages.billing import BillingPage
+from ui.pages.settings import SettingsPage
+
+from database import get_dashboard_stats, get_orders, get_popular_items
 
 import customtkinter as ctk
 
@@ -265,26 +272,38 @@ class RestaurantBillingApp(ctk.CTk):
         if page_name == "Dashboard":
             self.create_dashboard()
         elif page_name == "Menu":
-            menu_page = MenuPage(
+            menu_page = MenuPage(self.content_frame, self.colors)
+            menu_page.pack(fill="both", expand=True)
+        elif page_name == "Customers":
+            customers_page = CustomersPage(self.content_frame, self.colors)
+            customers_page.pack(fill="both", expand=True)
+        elif page_name == "Orders":
+            orders_page = OrdersPage(self.content_frame, self.colors)
+            orders_page.pack(fill="both", expand=True)
+        elif page_name == "Billing":
+            billing_page = BillingPage(self.content_frame, self.colors)
+            billing_page.pack(fill="both", expand=True)
+        elif page_name == "Calendar":
+            calendar_page = CalendarPage(self.content_frame, self.colors)
+            calendar_page.pack(fill="both", expand=True)
+        elif page_name == "Settings":
+            settings_page = SettingsPage(
                 self.content_frame,
-                self.colors
+                self.colors,
+                self.current_mode,
+                self.set_theme_mode,
             )
-            menu_page.pack(
-                fill="both",
-                expand=True
-            )
+            settings_page.pack(fill="both", expand=True)
         else:
             self.create_placeholder(page_name)
+
 
     def create_dashboard(self):
         container = ctk.CTkFrame(
             self.content_frame,
             fg_color="transparent",
         )
-        container.pack(
-            fill="both",
-            expand=True,
-        )
+        container.pack(fill="both", expand=True)
 
         welcome = ctk.CTkLabel(
             container,
@@ -315,11 +334,29 @@ class RestaurantBillingApp(ctk.CTk):
         )
         cards_frame.pack(fill="x")
 
+        stats = get_dashboard_stats()
+
         cards = [
-            ("Today's Revenue", "₹0.00", "No sales recorded"),
-            ("Today's Orders", "0", "No orders yet"),
-            ("Pending Orders", "0", "All caught up"),
-            ("Customers", "0", "Registered customers"),
+            (
+                "Completed Revenue",
+                f"₹{stats['completed_revenue']:,.2f}",
+                "Revenue from completed orders",
+            ),
+            (
+                "Total Orders",
+                str(stats["total_orders"]),
+                f"{stats['completed_orders']} completed",
+            ),
+            (
+                "Pending Orders",
+                str(stats["pending_orders"]),
+                "Awaiting completion",
+            ),
+            (
+                "Customers",
+                str(stats["customers"]),
+                "Registered customers",
+            ),
         ]
 
         for title, value, description in cards:
@@ -401,17 +438,114 @@ class RestaurantBillingApp(ctk.CTk):
                 weight="bold",
             ),
             text_color=self.colors["text_primary"],
-        ).pack(anchor="w", padx=20, pady=(20, 5))
+        ).pack(anchor="w", padx=20, pady=(20, 10))
 
-        ctk.CTkLabel(
-            recent_orders,
-            text="Orders will appear here once billing is started.",
-            font=ctk.CTkFont(
-                family=FONTS["small"][0],
-                size=12,
-            ),
-            text_color=self.colors["text_secondary"],
-        ).pack(anchor="w", padx=20, pady=5)
+        orders = get_orders()[:5]
+
+        if not orders:
+            ctk.CTkLabel(
+                recent_orders,
+                text="No orders yet. Create your first order in Billing.",
+                font=ctk.CTkFont(
+                    family=FONTS["small"][0],
+                    size=12,
+                ),
+                text_color=self.colors["text_secondary"],
+                wraplength=400,
+            ).pack(anchor="w", padx=20, pady=12)
+        else:
+            for order in orders:
+                (
+                    order_id,
+                    _customer_id,
+                    customer_name,
+                    _subtotal,
+                    _tax,
+                    _discount,
+                    total,
+                    _payment_method,
+                    status,
+                    created_at,
+                ) = order
+
+                row = ctk.CTkFrame(
+                    recent_orders,
+                    fg_color="transparent",
+                )
+                row.pack(
+                    fill="x",
+                    padx=16,
+                    pady=6,
+                )
+                row.grid_columnconfigure(0, weight=1)
+
+                details = ctk.CTkFrame(
+                    row,
+                    fg_color="transparent",
+                )
+                details.pack(
+                    side="left",
+                    fill="x",
+                    expand=True,
+                )
+
+                ctk.CTkLabel(
+                    details,
+                    text=(
+                        f"Order #{order_id} · "
+                        f"{customer_name or 'Walk-in customer'}"
+                    ),
+                    font=ctk.CTkFont(
+                        family=FONTS["body"][0],
+                        size=12,
+                        weight="bold",
+                    ),
+                    text_color=self.colors["text_primary"],
+                    anchor="w",
+                    wraplength=300,
+                ).pack(anchor="w")
+
+                ctk.CTkLabel(
+                    details,
+                    text=str(created_at),
+                    font=ctk.CTkFont(
+                        family=FONTS["small"][0],
+                        size=10,
+                    ),
+                    text_color=self.colors["text_secondary"],
+                    anchor="w",
+                ).pack(anchor="w", pady=(2, 0))
+
+                right = ctk.CTkFrame(
+                    row,
+                    fg_color="transparent",
+                )
+                right.pack(side="right", padx=(8, 0))
+
+                ctk.CTkLabel(
+                    right,
+                    text=f"₹{total:,.2f}",
+                    font=ctk.CTkFont(
+                        family=FONTS["body"][0],
+                        size=12,
+                        weight="bold",
+                    ),
+                    text_color=self.colors["text_primary"],
+                ).pack(anchor="e")
+
+                ctk.CTkLabel(
+                    right,
+                    text=status,
+                    font=ctk.CTkFont(
+                        family=FONTS["small"][0],
+                        size=10,
+                    ),
+                    text_color=(
+                        self.colors["accent"]
+                        if status == "Completed"
+                        else self.colors["text_secondary"]
+                    ),
+                ).pack(anchor="e", pady=(2, 0))
 
         popular_items = ctk.CTkFrame(
             lower_frame,
@@ -438,15 +572,49 @@ class RestaurantBillingApp(ctk.CTk):
             text_color=self.colors["text_primary"],
         ).pack(anchor="w", padx=20, pady=(20, 5))
 
-        ctk.CTkLabel(
-            popular_items,
-            text="Popular menu items will appear here.",
-            font=ctk.CTkFont(
-                family=FONTS["small"][0],
-                size=12,
-            ),
-            text_color=self.colors["text_secondary"],
-        ).pack(anchor="w", padx=20, pady=5)
+        popular = get_popular_items(limit=5)
+
+        if not popular:
+            ctk.CTkLabel(
+                popular_items,
+                text="No sales yet. Complete an order to see popular items.",
+                font=ctk.CTkFont(
+                    family=FONTS["small"][0],
+                    size=12,
+                ),
+                text_color=self.colors["text_secondary"],
+                wraplength=300,
+            ).pack(anchor="w", padx=20, pady=10)
+        else:
+            for rank, (item_name, quantity_sold) in enumerate(
+                popular,
+                start=1,
+            ):
+                item_row = ctk.CTkFrame(
+                    popular_items,
+                    fg_color="transparent",
+                )
+                item_row.pack(fill="x", padx=20, pady=5)
+
+                ctk.CTkLabel(
+                    item_row,
+                    text=f"{rank}. {item_name}",
+                    font=ctk.CTkFont(
+                        family=FONTS["body"][0],
+                        size=12,
+                    ),
+                    text_color=self.colors["text_primary"],
+                ).pack(side="left")
+
+                ctk.CTkLabel(
+                    item_row,
+                    text=f"{quantity_sold} sold",
+                    font=ctk.CTkFont(
+                        family=FONTS["small"][0],
+                        size=12,
+                    ),
+                    text_color=self.colors["text_secondary"],
+                ).pack(side="right")
 
     def create_placeholder(self, page_name):
         card = ctk.CTkFrame(
@@ -483,12 +651,22 @@ class RestaurantBillingApp(ctk.CTk):
         ).pack()
 
     def toggle_theme(self):
-        self.current_mode = (
+        self.set_theme_mode(
             "dark" if self.theme_switch.get() else "light"
         )
 
-        ctk.set_appearance_mode(self.current_mode)
+    def set_theme_mode(self, mode):
+        if mode not in ("dark", "light"):
+            return
 
+        self.current_mode = mode
+        if self.theme_switch.get() != (mode == "dark"):
+            if mode == "dark":
+                self.theme_switch.select()
+            else:
+                self.theme_switch.deselect()
+
+        ctk.set_appearance_mode(self.current_mode)
         self.refresh_theme()
 
     def refresh_theme(self):

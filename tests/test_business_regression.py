@@ -211,6 +211,102 @@ class ReportingRegressionTests(IsolatedDatabaseTestCase):
                 with self.assertRaises((ValueError, TypeError)):
                     reports.get_daily_revenue(days=days)
 
+    def test_daily_revenue_counts_only_completed_orders(self):
+        self.keepalive.execute(
+            """
+            INSERT INTO orders (subtotal, total, status, created_at)
+            VALUES
+                (100, 100, 'Completed', DATE('now')),
+                (50, 50, 'Pending', DATE('now')),
+                (75, 75, 'Completed', DATE('now', '-10 days'))
+            """
+        )
+        self.keepalive.commit()
+
+        revenue = reports.get_daily_revenue(days=7)
+
+        self.assertEqual(len(revenue), 1)
+        self.assertEqual(revenue[0][1], 100.0)
+
+    def test_popular_items_are_ranked_by_quantity_sold(self):
+        self.keepalive.execute(
+            """
+            INSERT INTO menu_items (name, category, price, available)
+            VALUES
+                ('Paneer', 'Main Course', 180, 1),
+                ('Burger', 'Fast Food', 120, 1),
+                ('Pizza', 'Fast Food', 250, 1)
+            """
+        )
+        self.keepalive.execute(
+            "INSERT INTO orders (subtotal, total) VALUES (1000, 1000)"
+        )
+        order_id = self.keepalive.execute(
+            "SELECT id FROM orders"
+        ).fetchone()[0]
+        menu_ids = dict(
+            self.keepalive.execute(
+                "SELECT name, id FROM menu_items"
+            ).fetchall()
+        )
+
+        self.keepalive.executemany(
+            """
+            INSERT INTO order_items (order_id, menu_item_id, quantity, unit_price)
+            VALUES (?, ?, ?, ?)
+            """,
+            [
+                (order_id, menu_ids["Paneer"], 2, 180),
+                (order_id, menu_ids["Burger"], 5, 120),
+                (order_id, menu_ids["Pizza"], 3, 250),
+            ],
+        )
+        self.keepalive.commit()
+
+        self.assertEqual(
+            reports.get_popular_items(),
+            [("Burger", 5), ("Pizza", 3), ("Paneer", 2)],
+        )
+
+    def test_popular_items_respect_limit(self):
+        self.keepalive.execute(
+            """
+            INSERT INTO menu_items (name, category, price, available)
+            VALUES ('A', 'Test', 10, 1), ('B', 'Test', 10, 1),
+                   ('C', 'Test', 10, 1)
+            """
+        )
+        self.keepalive.execute(
+            "INSERT INTO orders (subtotal, total) VALUES (30, 30)"
+        )
+        order_id = self.keepalive.execute(
+            "SELECT id FROM orders"
+        ).fetchone()[0]
+        menu_ids = self.keepalive.execute(
+            "SELECT id FROM menu_items ORDER BY name"
+        ).fetchall()
+
+        self.keepalive.executemany(
+            """
+            INSERT INTO order_items (order_id, menu_item_id, quantity, unit_price)
+            VALUES (?, ?, 1, 10)
+            """,
+            [(order_id, row[0]) for row in menu_ids],
+        )
+        self.keepalive.commit()
+
+        self.assertEqual(len(reports.get_popular_items(limit=2)), 2)
+
+    def test_popular_items_empty_result(self):
+        self.assertEqual(reports.get_popular_items(), [])
+
+    def test_invalid_popular_item_limits_are_rejected(self):
+        for limit in (0, -1, True, 1.5, "5", None):
+            with self.subTest(limit=limit):
+                with self.assertRaises((ValueError, TypeError)):
+                    reports.get_popular_items(limit=limit)
+
+
 
 if __name__ == "__main__":
     unittest.main(verbosity=2)
@@ -287,3 +383,6 @@ class SchemaInitializationRegressionTests(IsolatedDatabaseTestCase):
         self.assertTrue(
             {"customers", "menu_items", "orders", "order_items"}.issubset(tables)
         )
+
+if __name__ == "__main__":
+    unittest.main(verbosity=2)

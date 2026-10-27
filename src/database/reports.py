@@ -68,3 +68,29 @@ def get_daily_revenue(days=7):
 
     finally:
         connection.close()
+
+
+def get_popular_items(limit=5):
+    """Return menu items ranked by total quantity sold."""
+    if isinstance(limit, bool) or not isinstance(limit, int) or limit < 1:
+        raise ValueError("Limit must be a positive whole number.")
+
+    connection = get_connection()
+
+    try:
+        return connection.execute(
+            """
+            SELECT
+                m.name,
+                SUM(oi.quantity) AS quantity_sold
+            FROM order_items AS oi
+            JOIN menu_items AS m ON m.id = oi.menu_item_id
+            GROUP BY m.id, m.name
+            ORDER BY quantity_sold DESC, m.name COLLATE NOCASE ASC
+            LIMIT ?
+            """,
+            (limit,),
+        ).fetchall()
+
+    finally:
+        connection.close()

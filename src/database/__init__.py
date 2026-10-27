@@ -37,6 +37,7 @@ from database.orders import (
 from database.reports import (
     get_dashboard_stats,
     get_daily_revenue,
+    get_popular_items,
 )
 
 
